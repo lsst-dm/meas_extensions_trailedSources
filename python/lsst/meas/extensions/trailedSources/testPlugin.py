@@ -11,7 +11,8 @@ class SingleFrameTestConfig(SingleFramePluginConfig):
     """
     pass
 
-@register("ext_trailedSource_Test")
+
+@register("ext_trailedSources_Test")
 class SingleFrameTestPlugin(SingleFramePlugin):
     """Test SingleFramePlugin.
     """

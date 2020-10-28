@@ -22,6 +22,9 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-namespace lsst { meas { extensions { trailedSources {
+namespace lsst { 
+namespace meas { 
+namespace extensions {
+namespace trailedSources {
 
 }}}} // lsst::meas::extensions::trailedSources
