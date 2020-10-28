@@ -1,0 +1,6 @@
+python/lsst/meas/extensions/trailedSources/version.py
+*.pyc
+*.o
+*.os
+*.so
+config.log
