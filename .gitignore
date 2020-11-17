@@ -4,3 +4,8 @@ python/lsst/meas/extensions/trailedSources/version.py
 *.os
 *.so
 config.log
+.coverage
+.sconf_temp/
+.sconsign.dblite
+*.ipynb_checkpoints/
+tests/*
