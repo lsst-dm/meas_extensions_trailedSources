@@ -49,10 +49,20 @@ class SingleFrameTrailedSourcePlugin(SingleFramePlugin):
 
     @classmethod
     def getExecutionOrder(cls):
-        return cls.APCORR_ORDER
+        return cls.APCORR_ORDER + 0.1
 
     def __init__(self, config, name, schema, metadata):
         super().__init__(config, name, schema, metadata)
+        self.keyNHeadX = schema.addField(name + "_head_x_naive", type="D", doc="X coordinate of trail head.",
+                                         units="pixel")
+        self.keyNHeadY = schema.addField(name + "_head_y_naive", type="D", doc="Y coordinate of trail head.",
+                                         units="pixel")
+        self.keyNTailX = schema.addField(name + "_tail_x_naive", type="D", doc="X coordinate of trail tail.",
+                                         units="pixel")
+        self.keyNTailY = schema.addField(name + "_tail_y_naive", type="D", doc="Y coordinate of trail tail.",
+                                         units="pixel")
+        self.keyNFlux = schema.addField(name + "_flux_naive", type="D", doc="Flux of trailed source (n)",
+                                        units="count")
         self.keyHeadX = schema.addField(name + "_head_x", type="D", doc="X coordinate of trail head",
                                         units="pixel")
         self.keyHeadY = schema.addField(name + "_head_y", type="D", doc="Y coordinate of trail head",
@@ -77,14 +87,23 @@ class SingleFrameTrailedSourcePlugin(SingleFramePlugin):
         Measure trailed source end points and flux.
         Also record chi-squared and reduced chi-squared.
         """
-        res = self.optimize(measRecord, exposure)
-        F, x_h, y_h, x_t, y_t = res.x
         x0, y0 = self.centroidExtractor(measRecord, self.flagHandler)
+        x_h, y_h, x_t, y_t = self.getEndPoints(measRecord)
+        F = measRecord.getApInstFlux()
+        measRecord.set(self.keyNHeadX, x0 + x_h)
+        measRecord.set(self.keyNHeadY, y0 + y_h)
+        measRecord.set(self.keyNTailX, x0 + x_t)
+        measRecord.set(self.keyNTailY, y0 + y_t)
+        measRecord.set(self.keyNFlux, F)
+
+        params = np.array([F, x0 + x_h, y0 + y_h, x0 + x_t, y0 + y_t])
+        res = self.optimize(measRecord, exposure, params)
+        F, x_h, y_h, x_t, y_t = res.x
         reduced_chi2 = res.fun / (exposure.image.array.size - 5 - 1)
-        measRecord.set(self.keyHeadX, x0 + x_h)
-        measRecord.set(self.keyHeadY, y0 + y_h)
-        measRecord.set(self.keyTailX, x0 + x_t)
-        measRecord.set(self.keyTailY, y0 + y_t)
+        measRecord.set(self.keyHeadX, x_h)
+        measRecord.set(self.keyHeadY, y_h)
+        measRecord.set(self.keyTailX, x_t)
+        measRecord.set(self.keyTailY, y_t)
         measRecord.set(self.keyFlux, F)
         measRecord.set(self.keyRChi2, reduced_chi2)
 
@@ -101,8 +120,7 @@ class SingleFrameTrailedSourcePlugin(SingleFramePlugin):
         Ixx, Iyy, Ixy = measRecord.getShape().getParameterVector()
         a = np.sqrt(0.5 * (Ixx + Iyy + np.sqrt((Ixx - Iyy)**2.0 + 4.0*(Ixy**2.0))))
         theta = 0.5 * np.arctan2(2.0 * Ixy, Ixx - Iyy)
-        if theta < 0.0:
-            theta += np.pi
+        # if theta < 0.0: theta += np.pi
         return a, theta
 
     def getEndPoints(self, measRecord):
@@ -115,52 +133,48 @@ class SingleFrameTrailedSourcePlugin(SingleFramePlugin):
         y_t = a*np.sin(theta)
         return x_h, y_h, x_t, y_t
 
-    def psf(self, x0, y0, xdim, ydim, sigma):
+    def psf(self, exposure, x0, y0, sigma):
         """
         Point-spread function convolution kernel.
         Double guassian, centered at x0,y0.
         """
-        x = np.arange(-xdim//2 + 1, xdim//2 + 1) - x0
-        y = np.arange(-ydim//2 + 1, ydim//2 + 1) - y0
+        bb = exposure.getBBox()
+        x = np.arange(bb.beginX, bb.endX) - x0
+        y = np.arange(bb.beginY, bb.endY) - y0
 
-        r = np.sqrt((x[None, :])**2 + (y[:, None])**2)
+        r = np.sqrt((x[:, None])**2 + (y[None, :])**2)
         psf = np.exp(-r**2./2./sigma**2.) / (2*np.pi*sigma**2.)
 
         return psf
 
-    def makeTrailedSourceImage(self, params, xdim, ydim, npts=10, sigma=1.5):
+    def makeTrailedSourceImage(self, exposure, params, npts=10, sigma=1.5):
         """
         Generate trailed source image.
         Integrate a psf over path.
         """
-        F, xt, yt, xh, yh = params
-        image = np.zeros((ydim, xdim))
+        F, xh, yh, xt, yt = params
+        image = np.zeros(exposure.getDimensions())
 
-        xs = np.linspace(xt, xh, npts)
-        ys = np.linspace(yt, yh, npts)
+        xs = np.linspace(xh, xt, npts)
+        ys = np.linspace(yh, yt, npts)
 
         for i in range(xs.size):
-            image += self.psf(ys[i], xs[i], xdim, ydim, sigma=sigma)
+            image += self.psf(exposure, xs[i], ys[i], sigma)
 
         image = F * (image / image.sum())
         return image
 
-    def chiSquared(self, parameters, data, error, sigma, npts):
-        xdim, ydim = data.shape
-        model = self.makeTrailedSourceImage(parameters, xdim, ydim, sigma=sigma, npts=npts)
-        return np.sum(((data - model)**2.0 / error))
-
-    def optimize(self, measRecord, exposure):
-        F0 = measRecord.getApInstFlux()
-        x0, y0, x1, y1 = self.getEndPoints(measRecord)
-        p0 = np.array([F0, x0, y0, x1, y1])
-
+    def chiSquared(self, parameters, exposure, sigma, npts):
         data = exposure.image.array
         error = exposure.getVariance().array
+        model = self.makeTrailedSourceImage(exposure, parameters, sigma=sigma, npts=npts)
+        return np.sum(((data - model)**2.0 / error))
+
+    def optimize(self, measRecord, exposure, params):
         sigma = self.config.psfSigma
         npts = self.config.modelNumPoints
         method = self.config.optimizerMethod
 
-        res = minimize(self.chiSquared, p0, args=(data, error, sigma, npts),
+        res = minimize(self.chiSquared, params, args=(exposure, sigma, npts),
                        method=method, options={"maxiter": self.config.optimizerMaxIter})
         return res
