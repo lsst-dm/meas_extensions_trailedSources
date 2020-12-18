@@ -26,7 +26,6 @@
 #define LSST_MEAS_EXTENSIONS_TRAILEDSOURCES_H
 
 #include "lsst/pex/config.h"
-#include "lsst/geom.h"
 #include "lsst/meas/base/Algorithm.h"
 #include "lsst/meas/base/CentroidUtilities.h"
 #include "lsst/meas/base/FlagHandler.h"
@@ -34,7 +33,7 @@
 
 namespace lsst {
 namespace meas {
-namespace extenstions {
+namespace extensions {
 namespace trailedSources {
 
 /// This is used in the HSM extension
@@ -42,7 +41,7 @@ enum AlgType {
     NAIVE,    // Use only second moments to get end points
     CONVOLVE, // Use the Veres 2012 convolved model and optimize
     INTEGRATE // Use numerical integration of the PSF over a line
-}
+};
 
 /**
  * Control class to handle TrailedSourceAlgorithm's configuration
@@ -61,10 +60,12 @@ private:
     std::string _name;
 };
 
-class NaiveTrailedSourceControl : public TrailedSourceControl{
+/* Not working at the moment...
+class NaiveTrailedSourceControl : public TrailedSourceControl {
 public:
     NaiveTrailedSourceControl() : TrailedSourceControl("ext_trailedSources_Naive") {}
 };
+*/
 
 /*
  * Main Trailed-source measurement algorithm
@@ -72,27 +73,24 @@ public:
 class TrailedSourceAlgorithm : public base::SimpleAlgorithm {
 public:
     
-    static FlagDefinitionList const& getFlagDefinitions();
-    static FlagDefinition const FAILURE;
+    static base::FlagDefinitionList const& getFlagDefinitions();
+    static base::FlagDefinition const FAILURE;
     
     typedef TrailedSourceControl Control;
     
-    TrailedSourceAlgorithm(Control const& ctrl, std::string const& name, std::string const& algType,
-                           std::string const& doc, afw::table::Schema& schema);
+    TrailedSourceAlgorithm(Control const& ctrl, std::string const& name, //AlgType algType, std::string const& doc, 
+                           afw::table::Schema& schema);
     
     virtual void measure(afw::table::SourceRecord& measRecord,
                          afw::image::Exposure<float> const& exposure) const;
     
     virtual void fail(afw::table::SourceRecord& measRecord,
                       meas::base::MeasurementError* error = nullptr) const;
-    
-    
 
 private:
     Control _ctrl;
-    AlgType _algType;
+    // AlgType _algType;
     std::string _doc;
-
     afw::table::Key<double> _xHeadKey;
     afw::table::Key<double> _yHeadKey;
     afw::table::Key<double> _xTailKey;
@@ -102,17 +100,17 @@ private:
     base::SafeCentroidExtractor _centroidExtractor;
 };
 
+/* Not workin at the moment..
 class NaiveTrailedSourceAlgorithm : public TrailedSourceAlgorithm {
 public:
     typedef NaiveTrailedSourceControl Control;
-    NaiveTrailedSourceAlgorithm(Control const& ctrl, std::string const& name, afw::table::Schema& schema) :
+    NaiveTrailedSourceAlgorithm(Control const& ctrl, std::string const& name, afw::table::Schema& schema) : 
         TrailedSourceAlgorithm(ctrl, name, NAIVE, "Endpoints derived from second moments of PSF.", schema) {}
 
-    void measure(
-        afw::table::SourceRecord& measRecord,
-        afw::image::Exposure<float> const& exposure
-    ) const;
+    void measure(afw::table::SourceRecord& measRecord,
+                 afw::image::Exposure<float> const& exposure) const;
 };
+*/
 }}}} // namespace lsst::meas::extensions::trailedSources
 
 #endif // LSST_MEAS_EXTENSIONS_TRAILEDSOURCES_H

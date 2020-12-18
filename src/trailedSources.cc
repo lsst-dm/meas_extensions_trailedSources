@@ -21,8 +21,13 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
+
 #include "lsst/pex/exceptions.h"
 #include "lsst/geom/Box.h"
+#include "lsst/afw/geom/ellipses/Quadrupole.h"
+#include "lsst/afw/image.h"
+#include "lsst/afw/detection/Psf.h"
+#include "lsst/afw/table/Source.h"
 
 #include "lsst/meas/extensions/trailedSources/trailedSources.h"
 
@@ -32,7 +37,7 @@ namespace extensions {
 namespace trailedSources {
 
 namespace {
-lsst::meas::base::FlagDefinitions flagDefinitions;
+lsst::meas::base::FlagDefinitionList flagDefinitions;
 }
 
 base::FlagDefinition const TrailedSourceAlgorithm::FAILURE = flagDefinitions.addFailureFlag();
@@ -42,33 +47,33 @@ base::FlagDefinitionList const& TrailedSourceAlgorithm::getFlagDefinitions() { r
 TrailedSourceAlgorithm::TrailedSourceAlgorithm(
     Control const& ctrl,
     std::string const& name,
-    AlgType algType,
-    std::string const& doc,
+    // AlgType algType,
+    // std::string const& doc,
     afw::table::Schema& schema
 ) : _ctrl(ctrl),
-    _algType(algType),
-    _doc(doc),
-    _xHeadKey(schema.addField<double>(name + "_x0", doc)),
-    _yHeadKey(schema.addField<double>(name + "_y0", doc)),
-    _xTailKey(schema.addField<double>(name + "_x1", doc)),
-    _yTailKey(schema.addField<double>(name + "_y1", doc)),
-    _fluxKey(schema.addField<double>(name + "_flux", doc)),
-    _flagHandler(FlagHandler::addFields(schema, name, getFlagDefinitions()))
-    _centroidExtractor(schema, name, true) {}
+    // _algType(algType),
+    _doc("Naive trailed source"),
+    _xHeadKey(schema.addField<double>(name + "_x0", _doc)),
+    _yHeadKey(schema.addField<double>(name + "_y0", _doc)),
+    _xTailKey(schema.addField<double>(name + "_x1", _doc)),
+    _yTailKey(schema.addField<double>(name + "_y1", _doc)),
+    _fluxKey(schema.addField<double>(name + "_flux", _doc)),
+    _flagHandler(base::FlagHandler::addFields(schema, name, getFlagDefinitions())),
+    _centroidExtractor(schema, name) {}
 
-void NaiveTrailedSourceAlgorithm::measure(afw::table::SourceRecord& measRecord,
-                                          afw::image::Exposure<float> const& exposure) const {
-    // Translate python measurement script here
+void TrailedSourceAlgorithm::measure(afw::table::SourceRecord& measRecord,
+                                     afw::image::Exposure<float> const& exposure) const {
+    // Figure out how to separate this from main alg.
     // Make error flag for if no psf
     // get centroid
     geom::Point2D center = _centroidExtractor(measRecord, _flagHandler);
     double x = center.getX();
     double y = center.getY();
     // get quadrupole
-    geom::ellipses::Quadrupole quad = exposure.getPsf()->computeShape(center);
-    double Ixx = quad.getIxx();
-    double Iyy = quad.getIyy();
-    double Ixy = quad.getIxy();
+    // afw::geom::ellipses::Quadrupole quad = exposure.getPsf()->computeShape(center);
+    double Ixx = measRecord.getIxx();
+    double Iyy = measRecord.getIyy();
+    double Ixy = measRecord.getIxy();
     // calculate ellipse parameters (from afw::geom::ellipses::BaseCore)
     double xx_p_yy = Ixx + Iyy;
     double xx_m_yy = Ixx - Iyy;
@@ -84,14 +89,15 @@ void NaiveTrailedSourceAlgorithm::measure(afw::table::SourceRecord& measRecord,
     double F = measRecord.getApInstFlux(); // Change this later
     // set keys
     measRecord.set(_xHeadKey, x + x0);
-    measRecord.set(_xHeadKey, y + y0);
+    measRecord.set(_yHeadKey, y + y0);
     measRecord.set(_xTailKey, x + x1);
     measRecord.set(_yTailKey, y + y1);
     measRecord.set(_fluxKey, F);
     _flagHandler.setValue(measRecord, FAILURE.number, false);
 }
 
-void TrailedSourceAlgorithm::fail(afw::table::SourceRecord& measRecord, MeasurementError* error) const {
+void TrailedSourceAlgorithm::fail(afw::table::SourceRecord& measRecord, 
+                                  base::MeasurementError* error) const {
     _flagHandler.handleFailure(measRecord, error);
 }
 
