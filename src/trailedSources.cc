@@ -48,11 +48,11 @@ TrailedSourceAlgorithm::TrailedSourceAlgorithm(
     Control const& ctrl,
     std::string const& name,
     // AlgType algType,
-    // std::string const& doc,
+    std::string const& doc,
     afw::table::Schema& schema
 ) : _ctrl(ctrl),
     // _algType(algType),
-    _doc("Naive trailed source"),
+    _doc(doc),
     _xHeadKey(schema.addField<double>(name + "_x0", _doc)),
     _yHeadKey(schema.addField<double>(name + "_y0", _doc)),
     _xTailKey(schema.addField<double>(name + "_x1", _doc)),
@@ -63,8 +63,19 @@ TrailedSourceAlgorithm::TrailedSourceAlgorithm(
 
 void TrailedSourceAlgorithm::measure(afw::table::SourceRecord& measRecord,
                                      afw::image::Exposure<float> const& exposure) const {
-    // Figure out how to separate this from main alg.
-    // Make error flag for if no psf
+    
+    computeModel(measRecord, exposure)
+    _flagHandler.setValue(measRecord, FAILURE.number, false);
+}
+
+void TrailedSourceAlgorithm::fail(afw::table::SourceRecord& measRecord, 
+                                  base::MeasurementError* error) const {
+    _flagHandler.handleFailure(measRecord, error);
+}
+
+void NaiveTrailedSourceAlgorithm::computeModel(afw::table::SourceRecord& measRecord,
+                                               afw::image::Exposure<float> const& exposure) const {
+    // Make error flag for if no psf [ ]
     // get centroid
     geom::Point2D center = _centroidExtractor(measRecord, _flagHandler);
     double x = center.getX();
@@ -93,12 +104,6 @@ void TrailedSourceAlgorithm::measure(afw::table::SourceRecord& measRecord,
     measRecord.set(_xTailKey, x + x1);
     measRecord.set(_yTailKey, y + y1);
     measRecord.set(_fluxKey, F);
-    _flagHandler.setValue(measRecord, FAILURE.number, false);
-}
-
-void TrailedSourceAlgorithm::fail(afw::table::SourceRecord& measRecord, 
-                                  base::MeasurementError* error) const {
-    _flagHandler.handleFailure(measRecord, error);
 }
 
 }}}} // lsst::meas::extensions::trailedSources

@@ -36,11 +36,10 @@ namespace meas {
 namespace extensions {
 namespace trailedSources {
 
-/// This is used in the HSM extension
-enum AlgType {
-    NAIVE,    // Use only second moments to get end points
-    CONVOLVE, // Use the Veres 2012 convolved model and optimize
-    INTEGRATE // Use numerical integration of the PSF over a line
+enum Method {
+    NAIVE,      // Get end points from second momements
+    CONVOLVED,  // Use Veres et al. 2012 model (analytic)
+    INTEGRATED, // Integrate psf over trail (numerical)
 };
 
 /**
@@ -48,7 +47,6 @@ enum AlgType {
  */
 class TrailedSourceControl {
 public:
-        
     /**
      * Default constructor
      */
@@ -60,12 +58,11 @@ private:
     std::string _name;
 };
 
-/* Not working at the moment...
+// Not working at the moment...
 class NaiveTrailedSourceControl : public TrailedSourceControl {
 public:
     NaiveTrailedSourceControl() : TrailedSourceControl("ext_trailedSources_Naive") {}
 };
-*/
 
 /*
  * Main Trailed-source measurement algorithm
@@ -86,6 +83,9 @@ public:
     
     virtual void fail(afw::table::SourceRecord& measRecord,
                       meas::base::MeasurementError* error = nullptr) const;
+    
+    virtual void computeModel(afw::table::SourceRecord& measRecord,
+                              afw::image::Exposure<float> const& exposure) const;
 
 private:
     Control _ctrl;
@@ -100,17 +100,16 @@ private:
     base::SafeCentroidExtractor _centroidExtractor;
 };
 
-/* Not workin at the moment..
+// Not workin at the moment..
 class NaiveTrailedSourceAlgorithm : public TrailedSourceAlgorithm {
 public:
     typedef NaiveTrailedSourceControl Control;
     NaiveTrailedSourceAlgorithm(Control const& ctrl, std::string const& name, afw::table::Schema& schema) : 
-        TrailedSourceAlgorithm(ctrl, name, NAIVE, "Endpoints derived from second moments of PSF.", schema) {}
+        TrailedSourceAlgorithm(ctrl, name, "Naive trailed source", schema) {}
 
-    void measure(afw::table::SourceRecord& measRecord,
-                 afw::image::Exposure<float> const& exposure) const;
+    void computeModel(afw::table::SourceRecord& measRecord,
+                      afw::image::Exposure<float> const& exposure) const;
 };
-*/
 }}}} // namespace lsst::meas::extensions::trailedSources
 
 #endif // LSST_MEAS_EXTENSIONS_TRAILEDSOURCES_H
