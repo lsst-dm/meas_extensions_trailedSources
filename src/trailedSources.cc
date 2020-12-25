@@ -64,7 +64,7 @@ TrailedSourceAlgorithm::TrailedSourceAlgorithm(
 void TrailedSourceAlgorithm::measure(afw::table::SourceRecord& measRecord,
                                      afw::image::Exposure<float> const& exposure) const {
     
-    computeModel(measRecord, exposure)
+    computeModel(measRecord, exposure);
     _flagHandler.setValue(measRecord, FAILURE.number, false);
 }
 
