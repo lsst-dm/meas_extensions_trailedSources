@@ -22,11 +22,11 @@ PYBIND11_MODULE(trailedSources, mod) {
     
     py::class_<NaiveTrailedSourceAlgorithm, std::shared_ptr<NaiveTrailedSourceAlgorithm>, TrailedSourceAlgorithm>
             clsNaiveTrailedSourceAlgorithm(mod, "NaiveTrailedSourceAlgorithm");
-    py::class_<NaiveTrailedSourceControl>, TrailedSourceControl> 
+    py::class_<NaiveTrailedSourceControl, TrailedSourceControl> 
             clsNaiveTrailedSourceControl(mod, "NaiveTrailedSourceControl");
 
     /* Constructors */
-    clsNaiveTrailedSourceAlgorithm.def(py::init<TrailedSourceAlgorithm::Control const&, 
+    clsNaiveTrailedSourceAlgorithm.def(py::init<NaiveTrailedSourceAlgorithm::Control const&, 
                                   std::string const&, afw::table::Schema&>(),
                                   "ctrl"_a, "name"_a, "schema"_a);
     clsNaiveTrailedSourceControl.def(py::init<>());
@@ -34,5 +34,6 @@ PYBIND11_MODULE(trailedSources, mod) {
     /* Members */
     clsTrailedSourceAlgorithm.def("measure", &TrailedSourceAlgorithm::measure);
     clsTrailedSourceAlgorithm.def("fail", &TrailedSourceAlgorithm::fail);
+    clsNaiveTrailedSourceAlgorithm.def("computeModel", &NaiveTrailedSourceAlgorithm::computeModel);
 }
 }}}} // lsst::meas::extensions::trailedSources

@@ -75,8 +75,8 @@ public:
     
     typedef TrailedSourceControl Control;
     
-    TrailedSourceAlgorithm(Control const& ctrl, std::string const& name, //AlgType algType, std::string const& doc, 
-                           afw::table::Schema& schema);
+    TrailedSourceAlgorithm(Control const& ctrl, std::string const& name, 
+                           std::string const& doc, afw::table::Schema& schema);
     
     virtual void measure(afw::table::SourceRecord& measRecord,
                          afw::image::Exposure<float> const& exposure) const;
@@ -85,9 +85,9 @@ public:
                       meas::base::MeasurementError* error = nullptr) const;
     
     virtual void computeModel(afw::table::SourceRecord& measRecord,
-                              afw::image::Exposure<float> const& exposure) const;
+                              afw::image::Exposure<float> const& exposure) const {}
 
-private:
+protected:
     Control _ctrl;
     // AlgType _algType;
     std::string _doc;
