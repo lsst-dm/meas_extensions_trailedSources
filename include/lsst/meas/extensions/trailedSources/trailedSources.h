@@ -51,14 +51,13 @@ public:
      * Default constructor
      */
     TrailedSourceControl() : _name("") {}
-    
+
     TrailedSourceControl(std::string const& name) : _name(name) {}
 
 private:
     std::string _name;
 };
 
-// Not working at the moment...
 class NaiveTrailedSourceControl : public TrailedSourceControl {
 public:
     NaiveTrailedSourceControl() : TrailedSourceControl("ext_trailedSources_Naive") {}
@@ -69,27 +68,23 @@ public:
  */
 class TrailedSourceAlgorithm : public base::SimpleAlgorithm {
 public:
-    
+
     static base::FlagDefinitionList const& getFlagDefinitions();
     static base::FlagDefinition const FAILURE;
-    
+
     typedef TrailedSourceControl Control;
-    
-    TrailedSourceAlgorithm(Control const& ctrl, std::string const& name, 
+
+    TrailedSourceAlgorithm(Control const& ctrl, std::string const& name,
                            std::string const& doc, afw::table::Schema& schema);
-    
+
     virtual void measure(afw::table::SourceRecord& measRecord,
-                         afw::image::Exposure<float> const& exposure) const;
-    
+                         afw::image::Exposure<float> const& exposure) const {}
+
     virtual void fail(afw::table::SourceRecord& measRecord,
                       meas::base::MeasurementError* error = nullptr) const;
-    
-    virtual void computeModel(afw::table::SourceRecord& measRecord,
-                              afw::image::Exposure<float> const& exposure) const {}
 
 protected:
     Control _ctrl;
-    // AlgType _algType;
     std::string _doc;
     afw::table::Key<double> _xHeadKey;
     afw::table::Key<double> _yHeadKey;
@@ -100,15 +95,14 @@ protected:
     base::SafeCentroidExtractor _centroidExtractor;
 };
 
-// Not workin at the moment..
 class NaiveTrailedSourceAlgorithm : public TrailedSourceAlgorithm {
 public:
     typedef NaiveTrailedSourceControl Control;
-    NaiveTrailedSourceAlgorithm(Control const& ctrl, std::string const& name, afw::table::Schema& schema) : 
+    NaiveTrailedSourceAlgorithm(Control const& ctrl, std::string const& name, afw::table::Schema& schema) :
         TrailedSourceAlgorithm(ctrl, name, "Naive trailed source", schema) {}
 
-    void computeModel(afw::table::SourceRecord& measRecord,
-                      afw::image::Exposure<float> const& exposure) const;
+    void measure(afw::table::SourceRecord& measRecord,
+                 afw::image::Exposure<float> const& exposure) const;
 };
 }}}} // namespace lsst::meas::extensions::trailedSources
 
