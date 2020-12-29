@@ -36,12 +36,6 @@ namespace meas {
 namespace extensions {
 namespace trailedSources {
 
-enum Method {
-    NAIVE,      // Get end points from second momements
-    CONVOLVED,  // Use Veres et al. 2012 model (analytic)
-    INTEGRATED, // Integrate psf over trail (numerical)
-};
-
 /**
  * Control class to handle TrailedSourceAlgorithm's configuration
  */
@@ -61,6 +55,11 @@ private:
 class NaiveTrailedSourceControl : public TrailedSourceControl {
 public:
     NaiveTrailedSourceControl() : TrailedSourceControl("ext_trailedSources_Naive") {}
+};
+
+class ConvolvedTrailedSourceControl : public TrailedSourceControl {
+public:
+    ConvolvedTrailedSourceControl() : TrailedSourceControl("ext_trailedSources_Convolved") {}
 };
 
 /*
@@ -86,6 +85,7 @@ public:
 protected:
     Control _ctrl;
     std::string _doc;
+    afw::table::Schema _schema;
     afw::table::Key<double> _xHeadKey;
     afw::table::Key<double> _yHeadKey;
     afw::table::Key<double> _xTailKey;
@@ -104,6 +104,25 @@ public:
     void measure(afw::table::SourceRecord& measRecord,
                  afw::image::Exposure<float> const& exposure) const;
 };
+
+class ConvolvedTrailedSourceAlgorithm : public TrailedSourceAlgorithm {
+public:
+    typedef ConvolvedTrailedSourceControl Control;
+    ConvolvedTrailedSourceAlgorithm(Control const& ctrl, std::string const& name, afw::table::Schema& schema):
+        TrailedSourceAlgorithm(ctrl, name, "Convolved trailed source (Veres et al 2012)", schema) {}
+
+    // Make this private??
+    double _computeModel(double x, double y, double x0, double y0,
+                         double L, double theta, double sigma) const;
+
+    std::shared_ptr<afw::image::Image<double>> computeModelImage(
+        afw::table::SourceRecord& measRecord, afw::image::Exposure<float> const& exposure) const;
+
+    void measure(afw::table::SourceRecord& measRecord,
+                 afw::image::Exposure<float> const& exposure) const;
+
+};
+
 }}}} // namespace lsst::meas::extensions::trailedSources
 
 #endif // LSST_MEAS_EXTENSIONS_TRAILEDSOURCES_H
