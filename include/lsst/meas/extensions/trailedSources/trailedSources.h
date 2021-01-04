@@ -44,22 +44,26 @@ public:
     /**
      * Default constructor
      */
-    TrailedSourceControl() : _name("") {}
+    explicit TrailedSourceControl() : _name("") {}
 
-    TrailedSourceControl(std::string const& name) : _name(name) {}
+    explicit TrailedSourceControl(std::string const& name) : _name(name) {}
 
 private:
     std::string _name;
+
 };
 
 class NaiveTrailedSourceControl : public TrailedSourceControl {
 public:
-    NaiveTrailedSourceControl() : TrailedSourceControl("ext_trailedSources_Naive") {}
+    explicit NaiveTrailedSourceControl() : TrailedSourceControl("ext_trailedSources_Naive") {}
 };
 
 class ConvolvedTrailedSourceControl : public TrailedSourceControl {
 public:
-    ConvolvedTrailedSourceControl() : TrailedSourceControl("ext_trailedSources_Convolved") {}
+    // Figure out why this doesn't work
+    // LSST_CONTROL_FIELD(stepsize, double, "Step size for minimizer.");
+
+    explicit ConvolvedTrailedSourceControl() : TrailedSourceControl("ext_trailedSources_Convolved") {}
 };
 
 /*
@@ -73,7 +77,7 @@ public:
 
     typedef TrailedSourceControl Control;
 
-    TrailedSourceAlgorithm(Control const& ctrl, std::string const& name,
+    explicit TrailedSourceAlgorithm(Control const& ctrl, std::string const& name,
                            std::string const& doc, afw::table::Schema& schema);
 
     virtual void measure(afw::table::SourceRecord& measRecord,
@@ -98,29 +102,50 @@ protected:
 class NaiveTrailedSourceAlgorithm : public TrailedSourceAlgorithm {
 public:
     typedef NaiveTrailedSourceControl Control;
-    NaiveTrailedSourceAlgorithm(Control const& ctrl, std::string const& name, afw::table::Schema& schema) :
+    explicit NaiveTrailedSourceAlgorithm(Control const& ctrl, std::string const& name, afw::table::Schema& schema) :
         TrailedSourceAlgorithm(ctrl, name, "Naive trailed source", schema) {}
 
     void measure(afw::table::SourceRecord& measRecord,
                  afw::image::Exposure<float> const& exposure) const;
 };
 
+template <typename ReturnT>
+class ConvolvedTrailedSourceFunction2 : public afw::math::Function2<ReturnT> {
+public:
+    explicit ConvolvedTrailedSourceFunction2(std::vector<double> const& params, double sigma)
+    : afw::math::Function2<ReturnT>(params), _sigma(sigma) {};
+
+    // Needed for some reason...
+    std::shared_ptr<afw::math::Function2<ReturnT>> clone() const override {
+        return std::shared_ptr<afw::math::Function2<ReturnT>>(
+            new ConvolvedTrailedSourceFunction2(this->_params, _sigma)
+        );
+    }
+
+    ReturnT operator()(double x, double y) const noexcept(afw::math::IS_NOTHROW_INIT<ReturnT>) override {
+        return _computeModel(this->_params, _sigma, x, y);
+    }
+
+private:
+    double _computeModel(std::vector<double> const& params, double sigma, double x, double y) const;
+
+    double _sigma;
+};
+
 class ConvolvedTrailedSourceAlgorithm : public TrailedSourceAlgorithm {
 public:
     typedef ConvolvedTrailedSourceControl Control;
-    ConvolvedTrailedSourceAlgorithm(Control const& ctrl, std::string const& name, afw::table::Schema& schema):
+    explicit ConvolvedTrailedSourceAlgorithm(Control const& ctrl, std::string const& name, afw::table::Schema& schema):
         TrailedSourceAlgorithm(ctrl, name, "Convolved trailed source (Veres et al 2012)", schema) {}
 
-    // Make this private??
-    double _computeModel(double x, double y, double x0, double y0,
-                         double L, double theta, double sigma) const;
+    double computeModel(double x, double y, double x0, double y0, double F,
+                        double L, double theta, double sigma) const;
 
     std::shared_ptr<afw::image::Image<double>> computeModelImage(
         afw::table::SourceRecord& measRecord, afw::image::Exposure<float> const& exposure) const;
 
     void measure(afw::table::SourceRecord& measRecord,
                  afw::image::Exposure<float> const& exposure) const;
-
 };
 
 }}}} // namespace lsst::meas::extensions::trailedSources
