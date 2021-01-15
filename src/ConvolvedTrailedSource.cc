@@ -32,7 +32,7 @@
 #include "lsst/afw/math/minimize.h"
 #include "lsst/afw/math/Statistics.h"
 
-#include "lsst/meas/extensions/trailedSources/trailedSources.h"
+#include "lsst/meas/extensions/trailedSources/ConvolvedTrailedSource.h"
 
 namespace lsst {
 namespace meas {
@@ -43,67 +43,30 @@ namespace {
 lsst::meas::base::FlagDefinitionList flagDefinitions;
 }
 
-base::FlagDefinition const TrailedSourceAlgorithm::FAILURE = flagDefinitions.addFailureFlag();
+base::FlagDefinition const ConvolvedTrailedSourceAlgorithm::FAILURE = flagDefinitions.addFailureFlag();
 
-base::FlagDefinitionList const& TrailedSourceAlgorithm::getFlagDefinitions() { return flagDefinitions; }
+base::FlagDefinitionList const& ConvolvedTrailedSourceAlgorithm::getFlagDefinitions() { return flagDefinitions; }
 
-TrailedSourceAlgorithm::TrailedSourceAlgorithm(
+ConvolvedTrailedSourceAlgorithm::ConvolvedTrailedSourceAlgorithm(
     Control const& ctrl,
     std::string const& name,
-    std::string const& doc,
     afw::table::Schema& schema
 ) : _ctrl(ctrl),
-    _doc(doc),
+    _doc("Convolved trailed source (Veres et al 2012)"),
     _schema(schema),
     _xHeadKey(schema.addField<double>(name + "_x0", _doc)),
     _yHeadKey(schema.addField<double>(name + "_y0", _doc)),
     _xTailKey(schema.addField<double>(name + "_x1", _doc)),
     _yTailKey(schema.addField<double>(name + "_y1", _doc)),
-    _fluxKey(schema.addField<double>(name + "_flux", _doc)),
+    _totalFluxKey(schema.addField<double>(name + "_totalFlux", _doc)),
+    _sourceFluxKey(schema.addField<double>(name + "_sourceFlux", _doc)),
+    _chiSqKey(schema.addField<double>(name + "_chiSq", _doc)),
     _flagHandler(base::FlagHandler::addFields(schema, name, getFlagDefinitions())),
     _centroidExtractor(schema, name) {}
 
-void TrailedSourceAlgorithm::fail(afw::table::SourceRecord& measRecord,
-                                  base::MeasurementError* error) const {
-    _flagHandler.handleFailure(measRecord, error);
-}
-
-void NaiveTrailedSourceAlgorithm::measure(afw::table::SourceRecord& measRecord,
-                                          afw::image::Exposure<float> const& exposure) const {
-    // Make error flag for if no psf [ ]
-    // get centroid
-    geom::Point2D center = _centroidExtractor(measRecord, _flagHandler);
-    double x = center.getX();
-    double y = center.getY();
-    // get quadrupole
-    // afw::geom::ellipses::Quadrupole quad = exposure.getPsf()->computeShape(center);
-    double Ixx = measRecord.getIxx();
-    double Iyy = measRecord.getIyy();
-    double Ixy = measRecord.getIxy();
-    // calculate ellipse parameters (from afw::geom::ellipses::BaseCore)
-    double xx_p_yy = Ixx + Iyy;
-    double xx_m_yy = Ixx - Iyy;
-    double t = std::sqrt(xx_m_yy * xx_m_yy + 4 * Ixy * Ixy);
-    double a = std::sqrt(0.5 * (xx_p_yy + t));
-    double theta = 0.5 * std::atan2(2.0 * Ixy, xx_m_yy);
-    // Calculate end points
-    double x0 = -a*std::cos(theta);
-    double y0 = -a*std::sin(theta);
-    double x1 = a*std::cos(theta);
-    double y1 = a*std::sin(theta);
-    // calculate flux
-    double F = measRecord.getApInstFlux(); // Change this later
-    // set keys
-    measRecord.set(_xHeadKey, x + x0);
-    measRecord.set(_yHeadKey, y + y0);
-    measRecord.set(_xTailKey, x + x1);
-    measRecord.set(_yTailKey, y + y1);
-    measRecord.set(_fluxKey, F);
-    _flagHandler.setValue(measRecord, FAILURE.number, false);
-}
-
 template <typename ReturnT>
-double ConvolvedTrailedSourceFunction2<ReturnT>::_computeModel(std::vector<double> const& params,
+double ConvolvedTrailedSourceFunction2<ReturnT>::_computeModel(
+                                                  std::vector<double> const& params,
                                                   double sigma,
                                                   double x,
                                                   double y) const {
@@ -140,16 +103,16 @@ std::shared_ptr<afw::image::Image<double>> ConvolvedTrailedSourceAlgorithm::comp
     geom::Point2D center = _centroidExtractor(measRecord, _flagHandler);
     double xc = center.getX();
     double yc = center.getY();
-    std::string NAIVE = "ext_trailedSources_Convolved";
-    double F = measRecord[_schema.find<double>(NAIVE + "_flux").key];
-    double x0 = measRecord[_schema.find<double>(NAIVE + "_x0").key];
-    double y0 = measRecord[_schema.find<double>(NAIVE + "_y0").key];
-    double x1 = measRecord[_schema.find<double>(NAIVE + "_x1").key];
-    double y1 = measRecord[_schema.find<double>(NAIVE + "_y1").key];
+    std::string CON = "ext_trailedSources_Convolved";
+    double F = measRecord[_schema.find<double>(CON + "_sourceFlux").key];
+    double x0 = measRecord[_schema.find<double>(CON + "_x0").key];
+    double y0 = measRecord[_schema.find<double>(CON + "_y0").key];
+    double x1 = measRecord[_schema.find<double>(CON + "_x1").key];
+    double y1 = measRecord[_schema.find<double>(CON + "_y1").key];
     double x_m_x = x1 - x0;
     double y_m_y = y1 - y0;
     double L = std::sqrt(x_m_x*x_m_x + y_m_y*y_m_y); // Length of trail
-    double theta = std::atan2(y_m_y, x_m_x); // Angle measured from the image frame +x-axis (why flipped?)
+    double theta = -std::atan2(y_m_y, x_m_x); // Angle measured from the image frame +x-axis (why flipped?)
     double sigma = exposure.getPsf()->computeShape(center).getTraceRadius(); // Psf sigma.
 
     // Generate blank image, size of footprint
@@ -254,10 +217,16 @@ void ConvolvedTrailedSourceAlgorithm::measure(afw::table::SourceRecord& measReco
     measRecord.set(_yHeadKey, y0_fit);
     measRecord.set(_xTailKey, x1_fit);
     measRecord.set(_yTailKey, y1_fit);
-    // measRecord.set(_fluxKey, fitResults.chiSq / (height * width - modelFunction.getNParameters() - 1));
-    measRecord.set(_fluxKey, F_fit);
+    measRecord.set(_totalFluxKey, F);
+    measRecord.set(_sourceFluxKey, F_fit);
+    measRecord.set(_chiSqKey, fitResults.chiSq / (values.size() - modelFunction.getNParameters() - 1));
     _flagHandler.setValue(measRecord, FAILURE.number, false);
 
+}
+
+void ConvolvedTrailedSourceAlgorithm::fail(afw::table::SourceRecord& measRecord,
+                                           base::MeasurementError* error) const {
+    _flagHandler.handleFailure(measRecord, error);
 }
 
 }}}} // lsst::meas::extensions::trailedSources
