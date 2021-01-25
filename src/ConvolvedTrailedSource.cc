@@ -83,7 +83,7 @@ double ConvolvedTrailedSourceFunction2<ReturnT>::_computeModel(
     double A = std::exp(-0.5 * yp*yp / (sigma*sigma));
     double B = std::erf((xp+L/2) / (std::sqrt(2.0) * sigma));
     double C = std::erf((xp-L/2) / (std::sqrt(2.0) * sigma));
-    return 2.0 * F * A * (B - C) / L;
+    return F * A * (B - C) / (L * 2);
 }
 
 double ConvolvedTrailedSourceAlgorithm::computeModel(double x, double y, double x0, double y0, double F,
@@ -94,7 +94,7 @@ double ConvolvedTrailedSourceAlgorithm::computeModel(double x, double y, double 
     double A = std::exp(-0.5 * yp*yp / (sigma*sigma));
     double B = std::erf((xp+L/2) / (std::sqrt(2.0) * sigma));
     double C = std::erf((xp-L/2) / (std::sqrt(2.0) * sigma));
-    return 2.0 * F * A * (B - C) / L;
+    return F * A * (B - C) / (L * 2);
 }
 
 std::shared_ptr<afw::image::Image<double>> ConvolvedTrailedSourceAlgorithm::computeModelImage(
