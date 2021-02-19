@@ -8,5 +8,5 @@ config.log
 .sconf_temp/
 .sconsign.dblite
 *.ipynb_checkpoints/
-tests/*
+tests/.tests
 .vscode/
