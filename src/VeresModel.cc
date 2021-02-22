@@ -58,8 +58,8 @@ double VeresModel::operator()(std::vector<double> const& params) const {
 double VeresModel::_computeModel(double x, double y, double xc, double yc,
                                  double F, double L, double theta) const {
     // Computes the Veres et al model at a given position (pixel)
-    double xp = (x-xc)*std::cos(theta) - (y-yc)*std::sin(theta);
-    double yp = (x-xc)*std::sin(theta) + (y-yc)*std::cos(theta);
+    double xp = (x-xc)*std::cos(theta) + (y-yc)*std::sin(theta);
+    double yp = (x-xc)*std::sin(theta) - (y-yc)*std::cos(theta);
     double A = std::exp(-0.5 * yp*yp / (_sigma*_sigma));
     double B = std::erf((xp+L/2) / (std::sqrt(2.0) * _sigma));
     double C = std::erf((xp-L/2) / (std::sqrt(2.0) * _sigma));
