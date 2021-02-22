@@ -38,6 +38,8 @@ class SingleFrameVeresTrailPlugin(SingleFramePlugin):
         self.keyY0 = schema.addField(name + "_y0", type="D", doc="Trail head Y coordinate.", units="pixel")
         self.keyX1 = schema.addField(name + "_x1", type="D", doc="Trail tail X coordinate.", units="pixel")
         self.keyY1 = schema.addField(name + "_y1", type="D", doc="Trail tail Y coordinate.", units="pixel")
+        self.keyL = schema.addField(name + "_length", type="D", doc="Length of trail.", units="pixel")
+        self.keyTheta = schema.addField(name + "_angle", type="D", doc="Angle of trail from +x-axis.")
         self.keyFlux = schema.addField(name + "_flux", type="D", doc="Trailed source flux.", units="count")
         self.keyRChiSq = schema.addField(name + "_rChiSq", type="D", doc="Reduced chi-squared of fit")
 
@@ -56,11 +58,11 @@ class SingleFrameVeresTrailPlugin(SingleFramePlugin):
         # Look at measRecord for Naive end points ##
         # ASSUMES NAIVE ALREADY RAN
         # Should figure out an assert for this
-        x0 = measRecord["ext_trailedSources_Naive_x0"]
-        y0 = measRecord["ext_trailedSources_Naive_y0"]
-        x1 = measRecord["ext_trailedSources_Naive_x1"]
-        y1 = measRecord["ext_trailedSources_Naive_y1"]
-        F = measRecord["ext_trailedSources_Naive_flux"]
+        x0 = measRecord.get("ext_trailedSources_Naive_x0")
+        y0 = measRecord.get("ext_trailedSources_Naive_y0")
+        x1 = measRecord.get("ext_trailedSources_Naive_x1")
+        y1 = measRecord.get("ext_trailedSources_Naive_y1")
+        F = measRecord.get("ext_trailedSources_Naive_flux")
         L = np.sqrt((x1-x0)**2 + (y1-y0)**2)
         theta = np.arctan2(y1-y0, x1-x0)
 
@@ -68,24 +70,16 @@ class SingleFrameVeresTrailPlugin(SingleFramePlugin):
         params = np.array([xc, yc, F, L, theta])
         model = VeresModel(exposure, params)
 
-        # Bounds
-        bbox = exposure.getBBox()
-        xmin = bbox.getY0()
-        xmax = bbox.getX()
-        ymin = bbox.getY0()
-        ymax = bbox.getY()
-        bounds = ((xmin, xmax), (ymin, ymax), (1.0, None),
-                  (0.0, xmax), (-2*np.pi, 2*np.pi))
         # Do optimization with scipy
-        results = minimize(model, params, bound=bounds,
-                           method="Nelder-Mead")  # Allow user to choose alg
+        results = minimize(model, params, method='Powell')  # Should allow user to choose alg
 
         # Calculate end points and reduced chi-squared
-        xc_fit, yc_fit, L_fit, F_fit, theta_fit = results.x
-        x0_fit = xc_fit - L_fit/2 * np.cos(theta_fit)
-        y0_fit = yc_fit - L_fit/2 * np.sin(theta_fit)
-        x1_fit = xc_fit + L_fit/2 * np.cos(theta_fit)
-        y1_fit = yc_fit + L_fit/2 * np.sin(theta_fit)
+        xc_fit, yc_fit, F_fit, L_fit, theta_fit = results.x
+        a = L_fit/2
+        x0_fit = xc_fit - a * np.cos(theta_fit)
+        y0_fit = yc_fit - a * np.sin(theta_fit)
+        x1_fit = xc_fit + a * np.cos(theta_fit)
+        y1_fit = yc_fit + a * np.sin(theta_fit)
         rChiSq = results.fun / (exposure.image.array.size - 6)
 
         # Set keys
@@ -94,6 +88,8 @@ class SingleFrameVeresTrailPlugin(SingleFramePlugin):
         measRecord.set(self.keyX1, x1_fit)
         measRecord.set(self.keyY1, y1_fit)
         measRecord.set(self.keyFlux, F_fit)
+        measRecord.set(self.keyL, L_fit)
+        measRecord.set(self.keyTheta, theta_fit)
         measRecord.set(self.keyRChiSq, rChiSq)
 
     def fail(self, measRecord, error=None):
