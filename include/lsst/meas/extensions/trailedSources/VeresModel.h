@@ -15,7 +15,7 @@ class VeresModel {
 public:
     typedef afw::image::Image<float> Image;
     typedef afw::image::Exposure<float> Exposure;
-    typedef afw::image::MaskedImage<float> MaskedImage;
+    typedef afw::image::Image<float>::Array Array;
 
     explicit VeresModel(Exposure const& data, std::vector<double> const& params);
 
@@ -32,14 +32,14 @@ private:
     double _computeModel(double x, double y, double xc, double yc,
                          double F, double L, double theta) const;
 
-    // void _setParams(std::vector<double> const& params) {}
-
     double _sigma;
     std::vector<double> _params;
     lsst::geom::Box2I _bbox;
     lsst::geom::Extent2I _dims;
     std::shared_ptr<Image> _image;
-    std::shared_ptr<MaskedImage> _data;
+    Array _model;
+    Array _data;
+    Array _variance;
 };
 
 }}}} // lsst::meas::extensions::trailedSources

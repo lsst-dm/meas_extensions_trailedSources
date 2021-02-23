@@ -9,7 +9,8 @@ namespace extensions {
 namespace trailedSources {
 
 typedef afw::image::Image<float> Image;
-typedef afw::image::MaskedImage<float> MaskedImage;
+typedef afw::image::Exposure<float> Exposure;
+typedef afw::image::Image<float>::Array Array;
 
 VeresModel::VeresModel(
     Exposure const& data,
@@ -19,10 +20,11 @@ VeresModel::VeresModel(
     _bbox(data.getBBox()),
     _dims(data.getDimensions()),
     _image(new Image(_bbox)),
-    _data(std::make_shared<MaskedImage>(data.getMaskedImage())) {}
+    _model(_image->getArray()),
+    _data(data.getMaskedImage().getImage()->getArray()),
+    _variance(data.getMaskedImage().getVariance()->getArray()) {}
 
 double VeresModel::operator()(std::vector<double> const& params) const {
-    typedef afw::image::Image<float>::Array Array;
 
     // Unpack params
     double xc = params[0];    // Centroid x
@@ -36,15 +38,12 @@ double VeresModel::operator()(std::vector<double> const& params) const {
 
     // From computeKernelImage()
     // Compute model image and chi-squared
-    Array model = _image->getArray();
-    Array data = _data->getImage()->getArray();
-    Array var = _data->getVariance()->getArray();
     double chiSq = 0.0;
     double tmp = 0.0;
     for (int yIndex = 0, yp = _image->getY0(); yIndex < _dims.getY(); ++yIndex, ++yp) {
-        Array::Reference modelRow = model[yIndex];
-        Array::Reference dataRow = data[yIndex];
-        Array::Reference varRow = var[yIndex];
+        Array::Reference modelRow = _model[yIndex];
+        Array::Reference dataRow = _data[yIndex];
+        Array::Reference varRow = _variance[yIndex];
         for (int xIndex = 0, xp = _image->getX0(); xIndex < _dims.getX(); ++xIndex, ++xp) {
             modelRow[xIndex] = _computeModel(xp,yp,xc,yc,F,L,theta);
             tmp = dataRow[xIndex] - modelRow[xIndex];
