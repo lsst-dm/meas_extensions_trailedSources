@@ -67,10 +67,10 @@ class SingleFrameVeresTrailPlugin(SingleFramePlugin):
         theta = np.arctan2(y1-y0, x1-x0)
 
         # Make VeresModel
-        params = np.array([xc, yc, F, L, theta])
-        model = VeresModel(exposure, params)
+        model = VeresModel(exposure)
 
         # Do optimization with scipy
+        params = np.array([xc, yc, F, L, theta])
         results = minimize(model, params, method='Powell')  # Should allow user to choose alg
 
         # Calculate end points and reduced chi-squared

@@ -17,7 +17,7 @@ public:
     typedef afw::image::Exposure<float> Exposure;
     typedef afw::image::Image<float>::Array Array;
 
-    explicit VeresModel(Exposure const& data, std::vector<double> const& params);
+    explicit VeresModel(Exposure const& data);
 
     // Update parameters, and compute model image and chi-squared (for passing to optimizer)
     double operator()(std::vector<double> const& params) const;

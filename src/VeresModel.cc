@@ -13,10 +13,9 @@ typedef afw::image::Exposure<float> Exposure;
 typedef afw::image::Image<float>::Array Array;
 
 VeresModel::VeresModel(
-    Exposure const& data,
-    std::vector<double> const& params
+    Exposure const& data
 ) : _sigma(data.getPsf()->computeShape().getTraceRadius()),
-    _params(params),
+    _params({0.,0.,0.,0.,0.}),
     _bbox(data.getBBox()),
     _dims(data.getDimensions()),
     _image(new Image(_bbox)),
@@ -62,7 +61,7 @@ double VeresModel::_computeModel(double x, double y, double xc, double yc,
     double A = std::exp(-0.5 * yp*yp / (_sigma*_sigma));
     double B = std::erf((xp+L/2) / (std::sqrt(2.0) * _sigma));
     double C = std::erf((xp-L/2) / (std::sqrt(2.0) * _sigma));
-    return F * A * (B - C) / (L * 2);
+    return F * A * (B - C) / (L * 2 * std::sqrt(2.0 * geom::PI) * _sigma);
 }
 
 }}}} // lsst::meas::extensions::trailedSources

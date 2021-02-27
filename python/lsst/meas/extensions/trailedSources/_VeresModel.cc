@@ -27,8 +27,7 @@ void wrapVeresModel(utils::python::WrapperCollection& wrappers) {
         py::class_<VeresModel, std::shared_ptr<VeresModel>>(wrappers.module, "VeresModel"),
         [](auto & mod, auto & cls) {
             // cls.def(py::init<lsst::geom::Box2I const&, double>(), "bbox"_a, "sigma"_a);
-            cls.def(py::init<afw::image::Exposure<float> const&, std::vector<double> const&>(),
-                "data"_a, "params"_a);
+            cls.def(py::init<afw::image::Exposure<float> const&>(), "data"_a);
             cls.def("__call__",
                 py::overload_cast<std::vector<double> const&>(&VeresModel::operator(), py::const_));
             cls.def("getSigma", &VeresModel::getSigma);
