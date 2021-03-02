@@ -35,6 +35,8 @@ class SingleFrameNaiveTrailPlugin(SingleFramePlugin):
         self.keyX1 = schema.addField(name + "_x1", type="D", doc="Trail tail X coordinate.", units="pixel")
         self.keyY1 = schema.addField(name + "_y1", type="D", doc="Trail tail Y coordinate.", units="pixel")
         self.keyFlux = schema.addField(name + "_flux", type="D", doc="Trailed source flux.", units="count")
+        self.keyL = schema.addField(name + "_length", type="D", doc="Trail length.", units="pixel")
+        self.keyAngle = schema.addField(name + "_angle", type="D", doc="Angle measured from +x-axis.")
 
         # Measurement Error Keys
         self.keyX0Err = schema.addField(name + "_x0Err", type="D",
@@ -67,11 +69,12 @@ class SingleFrameNaiveTrailPlugin(SingleFramePlugin):
         xy2 = Ixy*Ixy
         a = np.sqrt(0.5 * (xpy + np.sqrt((xmy)**2 + 4.0*xy2)))
         theta = 0.5 * np.arctan2(2.0 * Ixy, xmy)
+
         x0 = xc-a*np.cos(theta)
         y0 = yc-a*np.sin(theta)
         x1 = xc+a*np.cos(theta)
         y1 = yc+a*np.sin(theta)
-        F = measRecord.getApInstFlux()  # Have this be set by user (?)
+        F = measRecord.get("base_SdssShape_instFlux")  # Should this even be done?
 
         # Calculate errors (Clean this up later...)
         xcErr2, ycErr2 = np.diag(measRecord.getCentroidErr())  # Is there a "safe" error extractor?
@@ -99,6 +102,8 @@ class SingleFrameNaiveTrailPlugin(SingleFramePlugin):
         measRecord.set(self.keyX1, x1)
         measRecord.set(self.keyY1, y1)
         measRecord.set(self.keyFlux, F)
+        measRecord.set(self.keyL, 2*a)
+        measRecord.set(self.keyAngle, theta)
         measRecord.set(self.keyX0Err, x0Err)
         measRecord.set(self.keyY0Err, y0Err)
         measRecord.set(self.keyX1Err, x0Err)
