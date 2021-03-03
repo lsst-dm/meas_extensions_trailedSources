@@ -1,3 +1,31 @@
+#
+# This file is part of meas_extensions_trailedSources.
+#
+# Developed for the LSST Data Management System.
+# This product includes software developed by the LSST Project
+# (http://www.lsst.org).
+# See the COPYRIGHT file at the top-level directory of this distribution
+# for details of code ownership.
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+#
+""" Naive trailed source measurement plugin.
+
+Computes the length, angle from +x-axis, and end points of an extended source
+using the second moments.
+"""
+
 import numpy as np
 
 from lsst.meas.base.pluginRegistry import register
@@ -8,7 +36,7 @@ __all__ = ("SingleFrameNaiveTrailConfig", "SingleFrameNaiveTrailPlugin")
 
 
 class SingleFrameNaiveTrailConfig(SingleFramePluginConfig):
-    """Config class for SingleFrameNaiveTrailPlugin
+    """Config class for SingleFrameNaiveTrailPlugin.
     """
 
     def setDefaults(self):
@@ -18,6 +46,21 @@ class SingleFrameNaiveTrailConfig(SingleFramePluginConfig):
 @register("ext_trailedSources_Naive")
 class SingleFrameNaiveTrailPlugin(SingleFramePlugin):
     """Naive trailed source characterization plugin
+
+    Parameters
+    ----------
+    config: `SingleFrameNaiveTrailConfig`
+        Plugin configuration.
+    name: `str`
+        Plugin name.
+    schema: `lsst.afw.table.Schema`
+        Schema for the output catalog.
+    metadata: `lsst.daf.base.PropertySet`
+        Metadata to be attached to output catalog.
+
+    See also
+    --------
+    lsst.meas.base.SingleFramePlugin
     """
 
     ConfigClass = SingleFrameNaiveTrailConfig
@@ -57,8 +100,18 @@ class SingleFrameNaiveTrailPlugin(SingleFramePlugin):
         self.centriodExtractor = SafeCentroidExtractor(schema, name)
 
     def measure(self, measRecord, exposure):
-        """
-        Measure trailed source end points and flux
+        """ Run the Naive trailed source measurement algorithm.
+
+        Parameters
+        ----------
+        measRecord : `lsst.afw.table.SourceRecord`
+            Record describing the object being measured.
+        exposure : `lsst.afw.image.Exposure`
+            Pixel data to be measured.
+
+        See also
+        --------
+        lsst.meas.base.SingleFramePlugin.measure
         """
         xc, yc = self.centriodExtractor(measRecord, self.flagHandler)
         Ixx, Iyy, Ixy = measRecord.getShape().getParameterVector()
@@ -112,5 +165,9 @@ class SingleFrameNaiveTrailPlugin(SingleFramePlugin):
 
     def fail(self, measRecord, error=None):
         """Record failure
+
+        See also
+        --------
+        lsst.meas.base.SingleFramePlugin.fail
         """
         self.flagHandler.handleFailure(measRecord)

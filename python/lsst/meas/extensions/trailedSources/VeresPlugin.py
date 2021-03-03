@@ -1,3 +1,31 @@
+#
+# This file is part of meas_extensions_trailedSources.
+#
+# Developed for the LSST Data Management System.
+# This product includes software developed by the LSST Project
+# (http://www.lsst.org).
+# See the COPYRIGHT file at the top-level directory of this distribution
+# for details of code ownership.
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+#
+""" Veres trailed source measurement plugin.
+
+Computes the length, angle from +x-axis, end points, flux, and centroid of an
+extended source. Base on the model from Veres el al. 2012.
+"""
+
 import numpy as np
 from scipy.optimize import minimize
 
@@ -20,9 +48,22 @@ class SingleFrameVeresTrailConfig(SingleFramePluginConfig):
 
 @register("ext_trailedSources_Veres")
 class SingleFrameVeresTrailPlugin(SingleFramePlugin):
-    """
+    """Veres trailed source characterization plugin.
 
-    Trailed source characterization plugin using the Veres et al. 2012 model.
+    Parameters
+    ----------
+    config: `SingleFrameNaiveTrailConfig`
+        Plugin configuration.
+    name: `str`
+        Plugin name.
+    schema: `lsst.afw.table.Schema`
+        Schema for the output catalog.
+    metadata: `lsst.daf.base.PropertySet`
+        Metadata to be attached to output catalog.
+
+    See also
+    --------
+    lsst.meas.base.SingleFramePlugin
     """
 
     ConfigClass = SingleFrameVeresTrailConfig
@@ -50,9 +91,18 @@ class SingleFrameVeresTrailPlugin(SingleFramePlugin):
         self.centroidExtractor = SafeCentroidExtractor(schema, name)
 
     def measure(self, measRecord, exposure):
-        """
-        Measure trailed source end points and flux,
-        and record reduced chi-squared for fit.
+        """Run the Veres trailed source measurement plugin.
+
+        Parameters
+        ----------
+        measRecord : `lsst.afw.table.SourceRecord`
+            Record describing the object being measured.
+        exposure : `lsst.afw.image.Exposure`
+            Pixel data to be measured.
+
+        See also
+        --------
+        lsst.meas.base.SingleFramePlugin.measure
         """
         xc, yc = self.centroidExtractor(measRecord, self.flagHandler)
         # Look at measRecord for Naive end points ##
@@ -94,5 +144,9 @@ class SingleFrameVeresTrailPlugin(SingleFramePlugin):
 
     def fail(self, measRecord, error=None):
         """Record failure
+
+        See also
+        --------
+        lsst.meas.base.SingleFramePlugin.fail
         """
         self.flagHandler.handleFailure(measRecord)
