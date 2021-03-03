@@ -36,26 +36,20 @@ class TrailedTestDataset(lsst.meas.base.tests.TestDataset):
     def addToSchema(self, schema):
         # Add Naive keys to schema
         name = "ext_trailedSources_Naive"
-        self.keys["x0"] = schema.addField(
-            name + "_x0", type="D", doc="Trail head X coordinate.", units="pixel")
-        self.keys["y0"] = schema.addField(
-            name + "_y0", type="D", doc="Trail head Y coordinate.", units="pixel")
-        self.keys["x1"] = schema.addField(
-            name + "_x1", type="D", doc="Trail tail X coordinate.", units="pixel")
-        self.keys["y1"] = schema.addField(
-            name + "_y1", type="D", doc="Trail tail Y coordinate.", units="pixel")
         self.keys["flux"] = schema.addField(
             name + "_flux", type="D", doc="Trailed source flux.", units="count")
+        self.keys["L"] = schema.addField(
+            name + "_length", type="D", doc="Trail length.", units="pixel")
+        self.keys["theta"] = schema.addField(
+            name + "_angle", type="D", doc="Trail angle from +x-axis.")
 
         return schema
 
     def addToCatalog(self, catalog, record):
         # Get Naive measurements and add to catalog
-        catalog[0].set(self.keys["x0"], record.get("ext_trailedSources_Naive_x0"))
-        catalog[0].set(self.keys["y0"], record.get("ext_trailedSources_Naive_y0"))
-        catalog[0].set(self.keys["x1"], record.get("ext_trailedSources_Naive_x1"))
-        catalog[0].set(self.keys["y1"], record.get("ext_trailedSources_Naive_y1"))
         catalog[0].set(self.keys["flux"], record.get("ext_trailedSources_Naive_flux"))
+        catalog[0].set(self.keys["L"], record.get("ext_trailedSources_Naive_length"))
+        catalog[0].set(self.keys["theta"], record.get("ext_trailedSources_Naive_angle"))
 
     def addTrailedSource(self, trail):
         """Add a trailed source to the simulation.

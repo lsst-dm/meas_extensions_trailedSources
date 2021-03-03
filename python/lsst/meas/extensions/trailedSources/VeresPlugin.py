@@ -75,6 +75,10 @@ class SingleFrameVeresTrailPlugin(SingleFramePlugin):
     def __init__(self, config, name, schema, metadata):
         super().__init__(config, name, schema, metadata)
 
+        self.keyXC = schema.addField(
+            name + "_centroid_x", type="D", doc="Trail centroid X coordinate.", units="pixel")
+        self.keyYC = schema.addField(
+            name + "_centroid_y", type="D", doc="Trail centroid Y coordinate.", units="pixel")
         self.keyX0 = schema.addField(name + "_x0", type="D", doc="Trail head X coordinate.", units="pixel")
         self.keyY0 = schema.addField(name + "_y0", type="D", doc="Trail head Y coordinate.", units="pixel")
         self.keyX1 = schema.addField(name + "_x1", type="D", doc="Trail tail X coordinate.", units="pixel")
@@ -105,16 +109,12 @@ class SingleFrameVeresTrailPlugin(SingleFramePlugin):
         lsst.meas.base.SingleFramePlugin.measure
         """
         xc, yc = self.centroidExtractor(measRecord, self.flagHandler)
-        # Look at measRecord for Naive end points ##
+        # Look at measRecord for Naive measurements ##
         # ASSUMES NAIVE ALREADY RAN
         # Should figure out an assert for this
-        x0 = measRecord.get("ext_trailedSources_Naive_x0")
-        y0 = measRecord.get("ext_trailedSources_Naive_y0")
-        x1 = measRecord.get("ext_trailedSources_Naive_x1")
-        y1 = measRecord.get("ext_trailedSources_Naive_y1")
         F = measRecord.get("ext_trailedSources_Naive_flux")
-        L = np.sqrt((x1-x0)**2 + (y1-y0)**2)
-        theta = np.arctan2(y1-y0, x1-x0)
+        L = measRecord.get("ext_trailedSources_Naive_length")
+        theta = measRecord.get("ext_trailedSources_Naive_angle")
 
         # Make VeresModel
         model = VeresModel(exposure)
@@ -133,6 +133,8 @@ class SingleFrameVeresTrailPlugin(SingleFramePlugin):
         rChiSq = results.fun / (exposure.image.array.size - 6)
 
         # Set keys
+        measRecord.set(self.keyXC, xc_fit)
+        measRecord.set(self.keyYC, yc_fit)
         measRecord.set(self.keyX0, x0_fit)
         measRecord.set(self.keyY0, y0_fit)
         measRecord.set(self.keyX1, x1_fit)
