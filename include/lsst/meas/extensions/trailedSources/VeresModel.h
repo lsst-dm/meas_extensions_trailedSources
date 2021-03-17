@@ -29,6 +29,7 @@
 #include "lsst/afw/image.h"
 #include "lsst/afw/geom.h"
 #include "lsst/geom.h"
+#include "ndarray.h"
 
 namespace lsst {
 namespace meas {
@@ -46,7 +47,6 @@ class VeresModel {
 public:
     typedef afw::image::Image<float> Image;
     typedef afw::image::Exposure<float> Exposure;
-    typedef afw::image::Image<float>::Array Array;
 
     /**
      * Constructor for VeresModel.
@@ -56,33 +56,43 @@ public:
     explicit VeresModel(Exposure const& data);
 
     /**
-     * Compute the model and chi-squared given the data.
+     * Compute chi-squared of the model given the data.
      *
      * @param params Model parameters. [centroid x, centroid y, trail flux,
      *     trail length, trail angle].
      *
-     * @return The chi-squared of the model, given the data.
+     * @return The chi-squared of the model.
      */
     double operator()(std::vector<double> const& params) const;
 
-    /// Return the current model image.
-    std::shared_ptr<Image> getModelImage() const { return _image; }
+    /**
+     * Compute the gradient of chi-squared of the model given the data.
+     *
+     * @param params Model parameters. [centroid x, centroid y, trail flux,
+     *     trail length, trail angle].
+     *
+     * @return The gradient of chi-squared of the model.
+     */
+    std::vector<double> gradient(std::vector<double> const& params);
 
     /// Return the PSF sigma.
     double getSigma() const { return _sigma; }
 
 private:
+    /// Computes the Veres et al. 2012 model for a given pixel located at (x,y).
     double _computeModel(double x, double y, double xc, double yc,
                          double F, double L, double theta) const;
 
+    /// Computes the gradient of the Veres et al. 2012 model for a given pixel located at (x,y).
+    void _computeGradient(double x, double y, double xc, double yc,
+                         double F, double L, double theta);
+
     double _sigma;
-    std::vector<double> _params;
     lsst::geom::Box2I _bbox;
-    lsst::geom::Extent2I _dims;
-    std::shared_ptr<Image> _image;
-    Array _model;
-    Array _data;
-    Array _variance;
+    Image::Array _model;
+    Image::Array _data;
+    Image::Array _variance;
+    std::vector<double> _gradModel;
 };
 
 }}}} // lsst::meas::extensions::trailedSources
