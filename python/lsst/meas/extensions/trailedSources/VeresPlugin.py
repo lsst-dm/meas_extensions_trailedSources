@@ -29,9 +29,12 @@ extended source. Base on the model from Veres el al. 2012.
 import numpy as np
 from scipy.optimize import minimize
 
+from lsst.pex.config import Field
+
 from lsst.meas.base.pluginRegistry import register
 from lsst.meas.base import SingleFramePlugin, SingleFramePluginConfig
 from lsst.meas.base import FlagHandler, FlagDefinitionList, SafeCentroidExtractor
+from lsst.meas.base import MeasurementError
 
 from ._trailedSources import VeresModel
 
@@ -41,6 +44,12 @@ __all__ = ("SingleFrameVeresTrailConfig", "SingleFrameVeresTrailPlugin")
 class SingleFrameVeresTrailConfig(SingleFramePluginConfig):
     """Config class for SingleFrameVeresTrailPlugin
     """
+
+    optimizerMethod = Field(
+        doc="Optimizer method for scipy.optimize.minimize",
+        dtype=str,
+        default="L-BFGS-B"
+    )
 
     def setDefaults(self):
         super().setDefaults()
@@ -90,6 +99,8 @@ class SingleFrameVeresTrailPlugin(SingleFramePlugin):
 
         flagDefs = FlagDefinitionList()
         flagDefs.addFailureFlag("No trailed-sources measured")
+        self.NON_CONVERGE = flagDefs.add("flag_nonConvergence", "Optimizer did not converge")
+        self.NO_NAIVE = flagDefs.add("flag_noNaive", "Naive measurement contains NaNs")
         self.flagHandler = FlagHandler.addFields(schema, name, flagDefs)
 
         self.centroidExtractor = SafeCentroidExtractor(schema, name)
@@ -109,19 +120,25 @@ class SingleFrameVeresTrailPlugin(SingleFramePlugin):
         lsst.meas.base.SingleFramePlugin.measure
         """
         xc, yc = self.centroidExtractor(measRecord, self.flagHandler)
-        # Look at measRecord for Naive measurements ##
+
+        # Look at measRecord for Naive measurements
         # ASSUMES NAIVE ALREADY RAN
-        # Should figure out an assert for this
         F = measRecord.get("ext_trailedSources_Naive_flux")
         L = measRecord.get("ext_trailedSources_Naive_length")
         theta = measRecord.get("ext_trailedSources_Naive_angle")
+        if np.isnan(F) or np.isnan(L) or np.isnan(theta):
+            raise MeasurementError(self.NO_NAIVE.doc, self.NO_NAIVE.number)
 
         # Make VeresModel
         model = VeresModel(exposure)
 
         # Do optimization with scipy
         params = np.array([xc, yc, F, L, theta])
-        results = minimize(model, params, method='Powell')  # Should allow user to choose alg
+        results = minimize(model, params, method=self.config.optimizerMethod, jac=model.gradient)
+
+        # Check if optimizer converged
+        if not results.success:
+            raise MeasurementError(self.NON_CONVERGE.doc, self.NON_CONVERGE.number)
 
         # Calculate end points and reduced chi-squared
         xc_fit, yc_fit, F_fit, L_fit, theta_fit = results.x
@@ -151,4 +168,7 @@ class SingleFrameVeresTrailPlugin(SingleFramePlugin):
         --------
         lsst.meas.base.SingleFramePlugin.fail
         """
-        self.flagHandler.handleFailure(measRecord)
+        if error is None:
+            self.flagHandler.handleFailure(measRecord)
+        else:
+            self.flagHandler.handleFailure(measRecord, error.cpp)

@@ -2,6 +2,7 @@ import numpy as np
 import unittest
 import lsst.utils.tests
 import lsst.meas.extensions.trailedSources
+from lsst.meas.extensions.trailedSources import VeresModel
 from lsst.meas.base.tests import AlgorithmTestCase
 from lsst.utils.tests import methodParameters
 
@@ -126,6 +127,9 @@ class TrailedSourcesTestCase(AlgorithmTestCase, lsst.utils.tests.TestCase):
         self.assertNotEqual(L, self.trail.length)
         self.assertNotEqual(theta, self.trail.angle)
 
+        # Make sure measurement flag is False
+        self.assertFalse(record.get("ext_trailedSources_Naive_flag"))
+
     def testVeresPlugin(self):
         # First run the Naive method
         taskNaive = self.makeTrailedSourceMeasurementTask(
@@ -146,6 +150,10 @@ class TrailedSourcesTestCase(AlgorithmTestCase, lsst.utils.tests.TestCase):
         taskVeres.run(catVeres, expVeres)
         record = catVeres[0]
 
+        # Make sure optmizer converged
+        converged = record.get("ext_trailedSources_Veres_flag_nonConvergence")
+        self.assertFalse(converged)
+
         # Compare measured trail length and angle to true values
         L = record.get("ext_trailedSources_Veres_length")
         theta = record.get("ext_trailedSources_Veres_angle")
@@ -160,6 +168,9 @@ class TrailedSourcesTestCase(AlgorithmTestCase, lsst.utils.tests.TestCase):
         rChiSq = record.get("ext_trailedSources_Veres_rChiSq")
         self.assertGreater(rChiSq, 0.9)
         self.assertLess(rChiSq, 1.1)
+
+        # Make sure measurement flag is False
+        self.assertFalse(record.get("ext_trailedSources_Veres_flag"))
 
 
 class TestMemory(lsst.utils.tests.MemoryTestCase):

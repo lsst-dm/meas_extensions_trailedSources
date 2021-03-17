@@ -31,6 +31,7 @@ import numpy as np
 from lsst.meas.base.pluginRegistry import register
 from lsst.meas.base import SingleFramePlugin, SingleFramePluginConfig
 from lsst.meas.base import FlagHandler, FlagDefinitionList, SafeCentroidExtractor
+from lsst.meas.base import MeasurementError
 
 __all__ = ("SingleFrameNaiveTrailConfig", "SingleFrameNaiveTrailPlugin")
 
@@ -90,11 +91,10 @@ class SingleFrameNaiveTrailPlugin(SingleFramePlugin):
                                         doc="Trail tail X coordinate error.", units="pixel")
         self.keyY1Err = schema.addField(name + "_y1Err", type="D",
                                         doc="Trail tail Y coordinate error.", units="pixel")
-        # self.keyFluxErr = schema.addField(name + "_fluxErr", type="D",
-        #                      doc="Trailed source flux error.", units="count")
 
         flagDefs = FlagDefinitionList()
         flagDefs.addFailureFlag("No trailed-source measured")
+        self.NO_FLUX = flagDefs.add("flag_noFlux", "No suitable prior flux measurement")
         self.flagHandler = FlagHandler.addFields(schema, name, flagDefs)
 
         self.centriodExtractor = SafeCentroidExtractor(schema, name)
@@ -118,19 +118,28 @@ class SingleFrameNaiveTrailPlugin(SingleFramePlugin):
         xmy = Ixx - Iyy
         xpy = Ixx + Iyy
         xmy2 = xmy*xmy
-        # xpy2 = xpy*xpy
         xy2 = Ixy*Ixy
         a = np.sqrt(0.5 * (xpy + np.sqrt((xmy)**2 + 4.0*xy2)))
-        theta = 0.5 * np.arctan2(2.0 * Ixy, xmy)
+        L = 2*a
 
+        theta = 0.5 * np.arctan2(2.0 * Ixy, xmy)
         x0 = xc-a*np.cos(theta)
         y0 = yc-a*np.sin(theta)
         x1 = xc+a*np.cos(theta)
         y1 = yc+a*np.sin(theta)
-        F = measRecord.get("base_SdssShape_instFlux")  # Should this even be done?
 
-        # Calculate errors (Clean this up later...)
-        xcErr2, ycErr2 = np.diag(measRecord.getCentroidErr())  # Is there a "safe" error extractor?
+        # For now, use the shape flux.
+        F = measRecord.get("base_SdssShape_instFlux")
+
+        # Fall back to aperture flux
+        if np.isnan(F):
+            if not np.isnan(measRecord.getInstApFlux()):
+                F = measRecord.getInstApFlux()
+            else:
+                raise MeasurementError(self.NO_FLUX.doc, self.NO_FLUX.number)
+
+        # Propagate errors from second moments
+        xcErr2, ycErr2 = np.diag(measRecord.getCentroidErr())
         IxxErr2, IyyErr2, IxyErr2 = np.diag(measRecord.getShapeErr())
         desc = np.sqrt(xmy2 + 4.0*xy2)  # Descriminant^1/2 of EV equation
         denom = 2*np.sqrt(2.0*(Ixx + np.sqrt(4.0*xy2 + xmy2 + Iyy)))  # Denominator for dadIxx and dadIyy
@@ -155,13 +164,12 @@ class SingleFrameNaiveTrailPlugin(SingleFramePlugin):
         measRecord.set(self.keyX1, x1)
         measRecord.set(self.keyY1, y1)
         measRecord.set(self.keyFlux, F)
-        measRecord.set(self.keyL, 2*a)
+        measRecord.set(self.keyL, L)
         measRecord.set(self.keyAngle, theta)
         measRecord.set(self.keyX0Err, x0Err)
         measRecord.set(self.keyY0Err, y0Err)
         measRecord.set(self.keyX1Err, x0Err)
         measRecord.set(self.keyY1Err, y0Err)
-        # measRecord.set(self.keyFluxErr, fluxErr)
 
     def fail(self, measRecord, error=None):
         """Record failure
@@ -170,4 +178,7 @@ class SingleFrameNaiveTrailPlugin(SingleFramePlugin):
         --------
         lsst.meas.base.SingleFramePlugin.fail
         """
-        self.flagHandler.handleFailure(measRecord)
+        if error is None:
+            self.flagHandler.handleFailure(measRecord)
+        else:
+            self.flagHandler.handleFailure(measRecord, error.cpp)
