@@ -1,3 +1,26 @@
+#
+# This file is part of meas_extensions_trailedSources.
+#
+# Developed for the LSST Data Management System.
+# This product includes software developed by the LSST Project
+# (http://www.lsst.org).
+# See the COPYRIGHT file at the top-level directory of this distribution
+# for details of code ownership.
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+#
+
 import numpy as np
 import unittest
 import lsst.utils.tests
@@ -16,6 +39,8 @@ ycs = np.random.uniform(0, 100, nTrails)
 
 
 class TrailedSource:
+    """Holds a set of true trail parameters.
+    """
 
     def __init__(self, instFlux, length, angle, xc, yc):
         self.instFlux = instFlux
@@ -30,30 +55,21 @@ class TrailedSource:
 
 # "Extend" meas.base.tests.TestDataset
 class TrailedTestDataset(lsst.meas.base.tests.TestDataset):
+    """A dataset for testing trailed source measurements.
+
+    Given a `TrailedSource`, construct a record of the true values and an
+    Exposure.
+    """
 
     def __init__(self, bbox, threshold=10.0, exposure=None, **kwds):
         super().__init__(bbox, threshold, exposure, **kwds)
 
-    def addToSchema(self, schema):
-        # Add Naive keys to schema
-        name = "ext_trailedSources_Naive"
-        self.keys["flux"] = schema.addField(
-            name + "_flux", type="D", doc="Trailed source flux.", units="count")
-        self.keys["L"] = schema.addField(
-            name + "_length", type="D", doc="Trail length.", units="pixel")
-        self.keys["theta"] = schema.addField(
-            name + "_angle", type="D", doc="Trail angle from +x-axis.")
-
-        return schema
-
-    def addToCatalog(self, catalog, record):
-        # Get Naive measurements and add to catalog
-        catalog[0].set(self.keys["flux"], record.get("ext_trailedSources_Naive_flux"))
-        catalog[0].set(self.keys["L"], record.get("ext_trailedSources_Naive_length"))
-        catalog[0].set(self.keys["theta"], record.get("ext_trailedSources_Naive_angle"))
-
     def addTrailedSource(self, trail):
         """Add a trailed source to the simulation.
+
+        'Re-implemented' version of
+        `lsst.meas.base.tests.TestDataset.addSource`. Numerically integrates a
+        Gaussian PSF over a line to obtain am image of a trailed source.
         """
 
         record = self.catalog.addNew()
@@ -64,6 +80,7 @@ class TrailedTestDataset(lsst.meas.base.tests.TestDataset):
         record.set(self.keys["shape"], self.psfShape)
         record.set(self.keys["isStar"], False)
 
+        # Sum the psf at each
         numIter = int(5*trail.length)
         xp = np.linspace(trail.x0, trail.x1, num=numIter)
         yp = np.linspace(trail.y0, trail.y1, num=numIter)
@@ -79,9 +96,10 @@ class TrailedTestDataset(lsst.meas.base.tests.TestDataset):
         return record, self.exposure.getImage()
 
 
+# Following from meas_base/test_NaiveCentroid.py
+# Taken from NaiveCentroidTestCase
 class TrailedSourcesTestCase(AlgorithmTestCase, lsst.utils.tests.TestCase):
-    # Following from meas_base/test_NaiveCentroid.py
-    # Taken from NaiveCentroidTestCase
+
     @methodParameters(L=Ls, theta=thetas, xc=xcs, yc=ycs)
     def setUp(self, L, theta, xc, yc):
         self.center = lsst.geom.Point2D(50.1, 49.8)
@@ -100,8 +118,13 @@ class TrailedSourcesTestCase(AlgorithmTestCase, lsst.utils.tests.TestCase):
 
     def makeTrailedSourceMeasurementTask(self, plugin=None, dependencies=(),
                                          config=None, schema=None, algMetadata=None):
+        """Set up a measurement task for a trailed source plugin.
+        """
+
         config = self.makeSingleFrameMeasurementConfig(plugin=plugin,
                                                        dependencies=dependencies)
+
+        # Make sure the shape slot is base_SdssShape
         config.slots.shape = "base_SdssShape"
         return self.makeSingleFrameMeasurementTask(plugin=plugin,
                                                    dependencies=dependencies,
@@ -109,6 +132,13 @@ class TrailedSourcesTestCase(AlgorithmTestCase, lsst.utils.tests.TestCase):
                                                    algMetadata=algMetadata)
 
     def testNaivePlugin(self):
+        """Test the NaivePlugin measurements.
+
+        Given a `TrailedTestDataset`, run the NaivePlugin measurement and
+        compare the measured parameters to the true values.
+        """
+
+        # Set up and run Naive measurement.
         task = self.makeTrailedSourceMeasurementTask(
             plugin="ext_trailedSources_Naive",
             dependencies=("base_SdssCentroid", "base_SdssShape")
@@ -131,24 +161,20 @@ class TrailedSourcesTestCase(AlgorithmTestCase, lsst.utils.tests.TestCase):
         self.assertFalse(record.get("ext_trailedSources_Naive_flag"))
 
     def testVeresPlugin(self):
-        # First run the Naive method
-        taskNaive = self.makeTrailedSourceMeasurementTask(
-            plugin="ext_trailedSources_Naive", dependencies=("base_SdssShape",)
-        )
-        expNaive, catNaive = self.dataset.realize(10.0, taskNaive.schema, randomSeed=0)
-        taskNaive.run(catNaive, expNaive)
+        """Test the VeresPlugin measurements.
 
-        # Now save the Naive measurements to the new catalog
-        taskVeres = self.makeTrailedSourceMeasurementTask(
-            plugin="ext_trailedSources_Veres", dependencies=("base_SdssShape",)
-        )
-        schema = self.dataset.addToSchema(taskVeres.schema)
-        expVeres, catVeres = self.dataset.realize(10.0, schema, randomSeed=0)
-        self.dataset.addToCatalog(catVeres, catNaive[0])
+        Given a `TrailedTestDataset`, run the VeresPlugin measurement and
+        compare the measured parameters to the true values.
+        """
 
-        # And run the Veres measurement
-        taskVeres.run(catVeres, expVeres)
-        record = catVeres[0]
+        # Set up and run Veres measurement.
+        task = self.makeTrailedSourceMeasurementTask(
+            plugin="ext_trailedSources_Veres",
+            dependencies=("base_SdssShape","ext_trailedSources_Naive")
+        )
+        exposure, catalog = self.dataset.realize(10.0, task.schema, randomSeed=0)
+        task.run(catalog, exposure)
+        record = catalog[0]
 
         # Make sure optmizer converged
         converged = record.get("ext_trailedSources_Veres_flag_nonConvergence")
