@@ -20,10 +20,16 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
-""" Naive trailed source measurement plugin.
+r"""Naive trailed source measurement plugin. Measures the length, angle from
++x-axis, and end points of an extended source using the second moments.
 
-Computes the length, angle from +x-axis, and end points of an extended source
-using the second moments.
+This measurement plugin aims to utilize the already measured shape second
+moments to naively estimate the length and angle, and thus end point, of a
+fast-moving, trailed source. A naive estimate for the trail length is obtained
+by doubling the semi-major axis, a, of the ellipse defined by the second
+moments. The angle, :math:`\Theta`, from the x-axis is computed similarly (via
+second moments). The end points of the trail are then given by
+:math:`(xc \pm a*cos(\Theta),yc \pm a*sin(\Theta))`.
 """
 
 import numpy as np
@@ -68,6 +74,8 @@ class SingleFrameNaiveTrailPlugin(SingleFramePlugin):
 
     @classmethod
     def getExecutionOrder(cls):
+        # Needs centroids, shape, and flux measurements.
+        # VeresPlugin is run after, which requires image data.
         return cls.APCORR_ORDER + 0.1
 
     def __init__(self, config, name, schema, metadata):
@@ -100,7 +108,7 @@ class SingleFrameNaiveTrailPlugin(SingleFramePlugin):
         self.centriodExtractor = SafeCentroidExtractor(schema, name)
 
     def measure(self, measRecord, exposure):
-        """ Run the Naive trailed source measurement algorithm.
+        """Run the Naive trailed source measurement algorithm.
 
         Parameters
         ----------
