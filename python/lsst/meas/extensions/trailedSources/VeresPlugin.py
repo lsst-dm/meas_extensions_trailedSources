@@ -20,10 +20,22 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
-""" Veres trailed source measurement plugin.
+"""Veres trailed source measurement plugin. Measures the length, angle from
++x-axis, end points, flux, and centroid of an extended source.
 
-Computes the length, angle from +x-axis, end points, flux, and centroid of an
-extended source. Base on the model from Veres el al. 2012.
+This plugin is designed to refine the measurements of trail length,
+angle, and end points from `NaivePlugin`, and of flux and centroid from
+previous measurement algorithms. Vereš et al. 2012 [1]_ derive a expression for
+the flux in a given image pixel by convolving an axisymmetric Gaussian with a
+line. The model is parameterized by the total flux, trail length, angle from
+the x-axis, and the centroid, and the best estimates are computed by a
+chi-squared minimization. The end points are then calculated as in
+`NaivePlugin`.
+
+References
+----------
+.. [1] Vereš, P., et al. "Improved Asteroid Astrometry and Photometry with
+Trail Fitting" PASP, vol. 124, 2012.
 """
 
 import numpy as np
@@ -37,6 +49,7 @@ from lsst.meas.base import FlagHandler, FlagDefinitionList, SafeCentroidExtracto
 from lsst.meas.base import MeasurementError
 
 from ._trailedSources import VeresModel
+from .NaivePlugin import SingleFrameNaiveTrailPlugin
 
 __all__ = ("SingleFrameVeresTrailConfig", "SingleFrameVeresTrailPlugin")
 
@@ -59,6 +72,9 @@ class SingleFrameVeresTrailConfig(SingleFramePluginConfig):
 class SingleFrameVeresTrailPlugin(SingleFramePlugin):
     """Veres trailed source characterization plugin.
 
+    Measures the length, angle, flux, centroid, and end points of a trailed
+    source using the Veres et al. 2012 model [1]_.
+
     Parameters
     ----------
     config: `SingleFrameNaiveTrailConfig`
@@ -70,6 +86,11 @@ class SingleFrameVeresTrailPlugin(SingleFramePlugin):
     metadata: `lsst.daf.base.PropertySet`
         Metadata to be attached to output catalog.
 
+    References
+    ----------
+    .. [1] Vereš, P., et al. "Improved Asteroid Astrometry and Photometry with
+    Trail Fitting" PASP, vol. 124, 2012.
+
     See also
     --------
     lsst.meas.base.SingleFramePlugin
@@ -79,7 +100,9 @@ class SingleFrameVeresTrailPlugin(SingleFramePlugin):
 
     @classmethod
     def getExecutionOrder(cls):
-        return cls.APCORR_ORDER + 0.2  # Needs to happen after Naive
+        # Needs centroids, shape, flux, and NaivePlugin measurements.
+        # Make sure this always runs after NaivePlugin.
+        return SingleFrameNaiveTrailPlugin.getExecutionOrder() + 0.1
 
     def __init__(self, config, name, schema, metadata):
         super().__init__(config, name, schema, metadata)
